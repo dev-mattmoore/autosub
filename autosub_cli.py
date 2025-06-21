@@ -1,4 +1,3 @@
-# autosub_cli.py
 import os
 import argparse
 import whisper
@@ -25,22 +24,35 @@ def write_srt(result, output_path):
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write(srt.compose(subtitles))
 
+def build_output_path(input_path, language, default, forced, sdh, fmt='srt'):
+    base = os.path.splitext(input_path)[0]
+    suffixes = [language or 'und']
+    if forced:
+        suffixes.append('forced')
+    if sdh:
+        suffixes.append('sdh')
+    if default:
+        suffixes.append('default')
+    return f"{base}." + ".".join(suffixes) + f".{fmt}"
+
 def main():
-    parser = argparse.ArgumentParser(description="Generate subtitles from video using Open AI Whisper")
+    parser = argparse.ArgumentParser(description="Generate subtitles from video using Whisper")
     parser.add_argument('--input', '-i', required=True, help='Path to input video file')
     parser.add_argument('--model', '-m', default='base', help='Whisper model size (tiny, base, small, medium, large)')
-    parser.add_argument('--language', '-l', default='en', help='Language code (e.g., en, es, fr)')
+    parser.add_argument('--language', '-l', default=None, help='Language code (e.g., en, es, fr)')
     parser.add_argument('--output-format', '-f', default='srt', choices=['srt'], help='Subtitle output format')
     parser.add_argument('--force', action='store_true', help='Force overwrite if subtitle already exists')
+    parser.add_argument('--default', action='store_true', help='Mark subtitle as default')
+    parser.add_argument('--forced', action='store_true', help='Mark subtitle as forced (used only for non-native dialogue)')
+    parser.add_argument('--sdh', action='store_true', help='Include SDH (Subtitles for Deaf and Hard of Hearing) flag')
 
     args = parser.parse_args()
 
-    base = os.path.splitext(args.input)[0]
-    audio_path = f"{base}_audio.wav"
-    srt_path = f"{base}.{args.language}.srt"
+    output_path = build_output_path(args.input, args.language, args.default, args.forced, args.sdh, args.output_format)
+    audio_path = os.path.splitext(args.input)[0] + "_audio.wav"
 
-    if os.path.exists(srt_path) and not args.force:
-        print(f"⚠️  Subtitle already exists: {srt_path} (use --force to overwrite)")
+    if os.path.exists(output_path) and not args.force:
+        print(f"⚠️  Subtitle already exists: {output_path} (use --force to overwrite)")
         return
 
     print(f"🟡 Extracting audio from {args.input}...")
@@ -49,8 +61,8 @@ def main():
     print(f"🟡 Transcribing with model '{args.model}'...")
     result = transcribe(audio_path, model_name=args.model, language=args.language)
 
-    print(f"🟢 Writing subtitles to {srt_path}...")
-    write_srt(result, srt_path)
+    print(f"🟢 Writing subtitles to {output_path}...")
+    write_srt(result, output_path)
 
     os.remove(audio_path)
     print("✅ Done.")
