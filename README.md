@@ -26,7 +26,7 @@ AutoSub is a Python-based tool for generating subtitles from video files. It use
 ## Usage
 Run the script with a video file as input:
 ```bash
-python transcribe_video.py <video_file>
+python autosub_cli.py -i <video_file>
 ```
 
 ## License

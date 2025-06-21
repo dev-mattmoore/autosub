@@ -26,10 +26,10 @@ def write_srt(result, output_path):
         f.write(srt.compose(subtitles))
 
 def main():
-    parser = argparse.ArgumentParser(description="Generate subtitles from video using Whisper")
+    parser = argparse.ArgumentParser(description="Generate subtitles from video using Open AI Whisper")
     parser.add_argument('--input', '-i', required=True, help='Path to input video file')
     parser.add_argument('--model', '-m', default='base', help='Whisper model size (tiny, base, small, medium, large)')
-    parser.add_argument('--language', '-l', default=None, help='Language code (e.g., en, es, fr)')
+    parser.add_argument('--language', '-l', default='en', help='Language code (e.g., en, es, fr)')
     parser.add_argument('--output-format', '-f', default='srt', choices=['srt'], help='Subtitle output format')
     parser.add_argument('--force', action='store_true', help='Force overwrite if subtitle already exists')
 
@@ -37,7 +37,7 @@ def main():
 
     base = os.path.splitext(args.input)[0]
     audio_path = f"{base}_audio.wav"
-    srt_path = f"{base}.srt"
+    srt_path = f"{base}.{args.language}.srt"
 
     if os.path.exists(srt_path) and not args.force:
         print(f"⚠️  Subtitle already exists: {srt_path} (use --force to overwrite)")
