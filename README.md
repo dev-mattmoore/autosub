@@ -12,7 +12,7 @@ AutoSub is a Python-based tool for generating subtitles from video files. It use
 
 ## Requirements
 - Python 3.12+
-- FFmpeg
+- FFmpeg (must be in your PATH)
 - [OpenAI Whisper](https://github.com/openai/whisper)
 - [psutil](https://pypi.org/project/psutil/)
 - [srt](https://pypi.org/project/srt/)
@@ -31,7 +31,7 @@ AutoSub is a Python-based tool for generating subtitles from video files. It use
 
 ## Usage
 
-You can process a single video file or all video files in a folder.
+You can process a single video file or all video files in a folder. All logs are written to `autosub.log` by default, and also shown in the console.
 
 ### Single File
 ```bash
@@ -54,6 +54,8 @@ python autosub_cli.py -i <folder_with_videos>
 - `--forced`: Mark subtitles as forced (non-native dialogue only).
 - `--sdh`: Include SDH (Subtitles for the Deaf and Hard of Hearing).
 - `--jobs`, `-j`: Number of parallel processes to use (auto-calculated if not set).
+- `--dry-run`: Only show what would be processed, do not generate output.
+- `--logfile`: Path to log file (default: `autosub.log`).
 
 ## Output Naming
 
@@ -84,6 +86,10 @@ To preview which files would be processed without generating output, use the `--
 ```bash
 python autosub_cli.py -i "/path/to/folder" --dry-run
 ```
+
+## Logging
+
+All processing steps, warnings, and errors are logged to both the console and a log file (default: `autosub.log`). You can change the log file location with the `--logfile` option.
 
 ## License
 

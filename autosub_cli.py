@@ -43,12 +43,12 @@ def build_output_path(input_path, language, default, forced, sdh, fmt='srt'):
         suffixes.append('default')
     return f"{base}." + ".".join(suffixes) + f".{fmt}"
 
-def setup_logging():
+def setup_logging(logfile):
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
     formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
     # File handler
-    fh = logging.FileHandler('autosub.log', encoding='utf-8')
+    fh = logging.FileHandler(logfile, encoding='utf-8')
     fh.setLevel(logging.INFO)
     fh.setFormatter(formatter)
     # Console handler
@@ -116,10 +116,11 @@ def main():
     parser.add_argument('--jobs', '-j', type=int, default=None,
                         help='Number of parallel processes to use (auto-calculated if not set)')
     parser.add_argument('--dry-run', action='store_true', help='Only show what would be processed, do not generate output')
+    parser.add_argument('--logfile', type=str, default='autosub.log', help='Path to log file (default: autosub.log)')
 
     args = parser.parse_args()
 
-    setup_logging()
+    setup_logging(args.logfile)
     logger = logging.getLogger()
 
     # Adjust job count based on available memory
