@@ -8,6 +8,8 @@ from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor
 import multiprocessing
 import psutil
+import logging
+import sys
 
 VIDEO_EXTS = ('.mkv', '.mp4', '.avi', '.mov')
 
@@ -41,6 +43,22 @@ def build_output_path(input_path, language, default, forced, sdh, fmt='srt'):
         suffixes.append('default')
     return f"{base}." + ".".join(suffixes) + f".{fmt}"
 
+def setup_logging():
+    logger = logging.getLogger()
+    logger.setLevel(logging.INFO)
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    # File handler
+    fh = logging.FileHandler('autosub.log', encoding='utf-8')
+    fh.setLevel(logging.INFO)
+    fh.setFormatter(formatter)
+    # Console handler
+    ch = logging.StreamHandler(sys.stdout)
+    ch.setLevel(logging.INFO)
+    ch.setFormatter(formatter)
+    logger.handlers = []
+    logger.addHandler(fh)
+    logger.addHandler(ch)
+
 def process_file(path, args_dict):
     language = args_dict['language']
     model = args_dict['model']
@@ -50,28 +68,40 @@ def process_file(path, args_dict):
     forced = args_dict['forced']
     sdh = args_dict['sdh']
     dry_run = args_dict.get('dry_run', False)
-
+    logger = logging.getLogger()
     output_path = build_output_path(path, language, default, forced, sdh, output_format)
 
     if dry_run:
-        print(f"📝 Would process: {Path(path).name} -> {Path(output_path).name}")
+        msg = f"📝 Would process: {Path(path).name} -> {Path(output_path).name}"
+        print(msg)
+        logger.info(msg)
         return
 
     audio_path = os.path.splitext(path)[0] + "_audio.wav"
 
     if os.path.exists(output_path) and not force:
-        print(f"⏩ Skipping (exists): {Path(path).name}")
+        msg = f"⏩ Skipping (exists): {Path(path).name}"
+        print(msg)
+        logger.info(msg)
         return
 
-    print(f"🎞️  Processing: {Path(path).name}")
+    msg = f"🎞️  Processing: {Path(path).name}"
+    print(msg)
+    logger.info(msg)
     try:
         extract_audio(path, audio_path)
         result = transcribe(audio_path, model_name=model, language=language)
         write_srt(result, output_path)
         os.remove(audio_path)
-        print(f"✅ Done: {Path(output_path).name}")
+        msg = f"✅ Done: {Path(output_path).name}"
+        print(msg)
+        logger.info(msg)
     except Exception as e:
-        print(f"❌ Failed to process {Path(path).name}: {e}")
+        import traceback
+        tb = traceback.format_exc()
+        msg = f"❌ Failed to process {Path(path).name}: {e}\n{tb}"
+        print(msg)
+        logger.error(msg)
 
 def main():
     parser = argparse.ArgumentParser(description="Generate subtitles from video(s) using OpenAI Whisper")
@@ -89,13 +119,18 @@ def main():
 
     args = parser.parse_args()
 
+    setup_logging()
+    logger = logging.getLogger()
+
     # Adjust job count based on available memory
     if args.jobs is None:
         total_mem_gb = psutil.virtual_memory().total / (1024 ** 3)
         # Rough estimate: 2GB per process (adjust as needed)
         est_jobs = max(1, min(multiprocessing.cpu_count(), int(total_mem_gb // 2)))
         args.jobs = est_jobs
-        print(f"🧠 Detected ~{total_mem_gb:.1f} GB RAM -> Using {args.jobs} parallel jobs")
+        msg = f"🧠 Detected ~{total_mem_gb:.1f} GB RAM -> Using {args.jobs} parallel jobs"
+        print(msg)
+        logger.info(msg)
 
     input_path = Path(args.input)
 
@@ -114,10 +149,14 @@ def main():
     elif input_path.is_dir():
         files = [f for f in input_path.iterdir() if f.suffix.lower() in VIDEO_EXTS]
         if not files:
-            print(f"⚠️  No video files found in {input_path}")
+            msg = f"⚠️  No video files found in {input_path}"
+            print(msg)
+            logger.warning(msg)
             return
 
-        print(f"🚀 Processing {len(files)} video(s) with {args.jobs} parallel jobs")
+        msg = f"🚀 Processing {len(files)} video(s) with {args.jobs} parallel jobs"
+        print(msg)
+        logger.info(msg)
 
         simple_args = {
             'language': args.language,
@@ -130,15 +169,23 @@ def main():
             'dry_run': args.dry_run
         }
 
+        logger.info("Batch processing started.")
         with ProcessPoolExecutor(max_workers=args.jobs) as executor:
             futures = [executor.submit(process_file, str(file), simple_args) for file in files]
             for future in futures:
                 try:
                     future.result()
                 except Exception as e:
-                    print(f"❌ Error during batch processing: {e}")
+                    import traceback
+                    tb = traceback.format_exc()
+                    msg = f"❌ Error during batch processing: {e}\n{tb}"
+                    print(msg)
+                    logger.error(msg)
+        logger.info("Batch processing finished.")
     else:
-        print("❌ Input path is invalid.")
+        msg = "❌ Input path is invalid."
+        print(msg)
+        logger.error(msg)
 
 if __name__ == "__main__":
     main()
