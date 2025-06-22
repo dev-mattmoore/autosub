@@ -89,7 +89,7 @@ python autosub_cli.py -i "/path/to/folder" --dry-run
 
 ## Logging
 
-All processing steps, warnings, and errors are logged to both the console and a log file (default: `autosub.log`). You can change the log file location with the `--logfile` option.
+By default, logs are written to a timestamped file (e.g., `autosub-YYYY-MM-DD_HH-MM-SS.log`) and to the console. A symlink `autosub-latest.log` always points to the latest log file. You can change the log file location with the `--logfile` option, or use `--no-logfile` to disable file logging and only log to the console.
 
 ## License
 

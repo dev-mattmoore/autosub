@@ -1,6 +1,6 @@
 # Makefile for AutoSub
 
-.PHONY: help install lint format test clean run
+.PHONY: help install lint format test clean run tail
 
 help:
 	@echo "AutoSub Makefile commands:"
@@ -9,7 +9,7 @@ help:
 	@echo "  format    Run black on source files"
 	@echo "  test      Run tests (if any)"
 	@echo "  clean     Remove Python cache and build artifacts"
-	@echo "  run       Run the CLI with example arguments"
+	@echo "  tail      Tail the autosub-latest.log file"
 
 install:
 	python3 -m venv venv
@@ -26,3 +26,6 @@ test:
 
 clean:
 	rm -rf *.log
+
+tail:
+	tail -f autosub-latest.log

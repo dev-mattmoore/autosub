@@ -3,7 +3,7 @@ import argparse
 import whisper
 import subprocess
 import srt
-import datetime
+from datetime import datetime
 from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor
 import multiprocessing
@@ -66,16 +66,17 @@ def setup_logging(logfile):
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
     formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-    # File handler
-    fh = logging.FileHandler(logfile, encoding="utf-8")
-    fh.setLevel(logging.INFO)
-    fh.setFormatter(formatter)
-    # Console handler
+    logger.handlers = []
+
+    if logfile:
+        fh = logging.FileHandler(logfile, encoding="utf-8")
+        fh.setLevel(logging.INFO)
+        fh.setFormatter(formatter)
+        logger.addHandler(fh)
+
     ch = logging.StreamHandler(sys.stdout)
     ch.setLevel(logging.INFO)
     ch.setFormatter(formatter)
-    logger.handlers = []
-    logger.addHandler(fh)
     logger.addHandler(ch)
 
 
@@ -190,10 +191,31 @@ def main():
         default="autosub.log",
         help="Path to log file (default: autosub.log)",
     )
+    parser.add_argument(
+        "--no-logfile",
+        action="store_true",
+        help="Disable all logging to file (only console output)",
+    )
 
     args = parser.parse_args()
 
-    setup_logging(args.logfile)
+    if args.no_logfile:
+        setup_logging(None)
+    else:
+        if args.logfile == "autosub.log":
+            timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            args.logfile = f"autosub-{timestamp}.log"
+        setup_logging(args.logfile)
+
+        # Create or update symlink to latest log file
+        latest_symlink = Path("autosub-latest.log")
+        try:
+            if latest_symlink.exists() or latest_symlink.is_symlink():
+                latest_symlink.unlink()
+            latest_symlink.symlink_to(Path(args.logfile).resolve())
+        except Exception as e:
+            print(f"⚠️  Could not update symlink: {e}")
+
     logger = logging.getLogger()
 
     # Adjust job count based on available memory
