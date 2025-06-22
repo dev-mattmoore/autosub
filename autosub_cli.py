@@ -7,6 +7,7 @@ import datetime
 from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor
 import multiprocessing
+import psutil
 
 VIDEO_EXTS = ('.mkv', '.mp4', '.avi', '.mov')
 
@@ -76,10 +77,19 @@ def main():
     parser.add_argument('--default', action='store_true', help='Mark subtitle as default')
     parser.add_argument('--forced', action='store_true', help='Mark subtitle as forced (non-native dialogue only)')
     parser.add_argument('--sdh', action='store_true', help='Include SDH (subtitles for the deaf and hard of hearing)')
-    parser.add_argument('--jobs', '-j', type=int, default=max(1, multiprocessing.cpu_count() // 2),
-                        help='Number of parallel processes to use (default: half of CPU cores)')
+    parser.add_argument('--jobs', '-j', type=int, default=None,
+                        help='Number of parallel processes to use (auto-calculated if not set)')
 
     args = parser.parse_args()
+
+    # Adjust job count based on available memory
+    if args.jobs is None:
+        total_mem_gb = psutil.virtual_memory().total / (1024 ** 3)
+        # Rough estimate: 2GB per process (adjust as needed)
+        est_jobs = max(1, min(multiprocessing.cpu_count(), int(total_mem_gb // 2)))
+        args.jobs = est_jobs
+        print(f"🧠 Detected ~{total_mem_gb:.1f} GB RAM -> Using {args.jobs} parallel jobs")
+
     input_path = Path(args.input)
 
     if input_path.is_file():
