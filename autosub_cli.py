@@ -49,8 +49,14 @@ def process_file(path, args_dict):
     default = args_dict['default']
     forced = args_dict['forced']
     sdh = args_dict['sdh']
+    dry_run = args_dict.get('dry_run', False)
 
     output_path = build_output_path(path, language, default, forced, sdh, output_format)
+
+    if dry_run:
+        print(f"📝 Would process: {Path(path).name} -> {Path(output_path).name}")
+        return
+
     audio_path = os.path.splitext(path)[0] + "_audio.wav"
 
     if os.path.exists(output_path) and not force:
@@ -79,6 +85,7 @@ def main():
     parser.add_argument('--sdh', action='store_true', help='Include SDH (subtitles for the deaf and hard of hearing)')
     parser.add_argument('--jobs', '-j', type=int, default=None,
                         help='Number of parallel processes to use (auto-calculated if not set)')
+    parser.add_argument('--dry-run', action='store_true', help='Only show what would be processed, do not generate output')
 
     args = parser.parse_args()
 
@@ -100,7 +107,8 @@ def main():
             'force': args.force,
             'default': args.default,
             'forced': args.forced,
-            'sdh': args.sdh
+            'sdh': args.sdh,
+            'dry_run': args.dry_run
         }
         process_file(str(input_path), simple_args)
     elif input_path.is_dir():
@@ -118,7 +126,8 @@ def main():
             'force': args.force,
             'default': args.default,
             'forced': args.forced,
-            'sdh': args.sdh
+            'sdh': args.sdh,
+            'dry_run': args.dry_run
         }
 
         with ProcessPoolExecutor(max_workers=args.jobs) as executor:

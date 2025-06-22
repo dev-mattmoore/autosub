@@ -77,3 +77,14 @@ Process all videos in a folder with automatic parallelization:
 ```bash
 python autosub_cli.py -i "/path/to/folder"
 ```
+
+## Dry Run Mode
+
+To preview which files would be processed without generating output, use the `--dry-run` flag:
+```bash
+python autosub_cli.py -i "/path/to/folder" --dry-run
+```
+
+## License
+
+This project is licensed under the MIT License.
