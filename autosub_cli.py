@@ -10,6 +10,10 @@ import multiprocessing
 import psutil
 import logging
 import sys
+from colorama import init, Fore
+
+# Global variable to control colorized output
+USE_COLOR = True
 
 VIDEO_EXTS = (".mkv", ".mp4", ".avi", ".mov")
 
@@ -80,6 +84,22 @@ def setup_logging(logfile):
     logger.addHandler(ch)
 
 
+def console_print(msg, level="info"):
+    if not USE_COLOR:
+        print(msg)
+        return
+    if level == "warning":
+        print(Fore.YELLOW + msg)
+    elif level == "success":
+        print(Fore.GREEN + msg)
+    elif level == "error":
+        print(Fore.RED + msg)
+    elif level == "info-cyan":
+        print(Fore.CYAN + msg)
+    else:
+        print(msg)
+
+
 def process_file(path, args_dict):
     language = args_dict["language"]
     model = args_dict["model"]
@@ -94,7 +114,7 @@ def process_file(path, args_dict):
 
     if dry_run:
         msg = f"📝 Would process: {Path(path).name} -> {Path(output_path).name}"
-        print(msg)
+        console_print(msg, "warning")
         logger.info(msg)
         return
 
@@ -102,12 +122,12 @@ def process_file(path, args_dict):
 
     if os.path.exists(output_path) and not force:
         msg = f"⏩ Skipping (exists): {Path(path).name}"
-        print(msg)
+        console_print(msg, "warning")
         logger.info(msg)
         return
 
     msg = f"🎞️  Processing: {Path(path).name}"
-    print(msg)
+    console_print(msg, "info-cyan")
     logger.info(msg)
     try:
         extract_audio(path, audio_path)
@@ -115,18 +135,19 @@ def process_file(path, args_dict):
         write_srt(result, output_path)
         os.remove(audio_path)
         msg = f"✅ Done: {Path(output_path).name}"
-        print(msg)
+        console_print(msg, "success")
         logger.info(msg)
     except Exception as e:
         import traceback
 
         tb = traceback.format_exc()
         msg = f"❌ Failed to process {Path(path).name}: {e}\n{tb}"
-        print(msg)
+        console_print(msg, "error")
         logger.error(msg)
 
 
 def main():
+    init(autoreset=True)
     parser = argparse.ArgumentParser(
         description="Generate subtitles from video(s) using OpenAI Whisper"
     )
@@ -196,8 +217,16 @@ def main():
         action="store_true",
         help="Disable all logging to file (only console output)",
     )
+    parser.add_argument(
+        "--no-color",
+        action="store_true",
+        help="Disable colorized console output"
+    )
 
     args = parser.parse_args()
+
+    global USE_COLOR
+    USE_COLOR = not args.no_color
 
     if args.no_logfile:
         setup_logging(None)
@@ -214,7 +243,7 @@ def main():
                 latest_symlink.unlink()
             latest_symlink.symlink_to(Path(args.logfile).resolve())
         except Exception as e:
-            print(f"⚠️  Could not update symlink: {e}")
+            console_print(f"⚠️  Could not update symlink: {e}", "warning")
 
     logger = logging.getLogger()
 
@@ -227,7 +256,7 @@ def main():
         msg = (
             f"🧠 Detected ~{total_mem_gb:.1f} GB RAM -> Using {args.jobs} parallel jobs"
         )
-        print(msg)
+        console_print(msg, "info-cyan")
         logger.info(msg)
 
     input_path = Path(args.input)
@@ -248,12 +277,12 @@ def main():
         files = [f for f in input_path.iterdir() if f.suffix.lower() in VIDEO_EXTS]
         if not files:
             msg = f"⚠️  No video files found in {input_path}"
-            print(msg)
+            console_print(msg, "warning")
             logger.warning(msg)
             return
 
         msg = f"🚀 Processing {len(files)} video(s) with {args.jobs} parallel jobs"
-        print(msg)
+        console_print(msg, "info-cyan")
         logger.info(msg)
 
         simple_args = {
@@ -280,12 +309,12 @@ def main():
 
                     tb = traceback.format_exc()
                     msg = f"❌ Error during batch processing: {e}\n{tb}"
-                    print(msg)
+                    console_print(msg, "error")
                     logger.error(msg)
         logger.info("Batch processing finished.")
     else:
         msg = "❌ Input path is invalid."
-        print(msg)
+        console_print(msg, "error")
         logger.error(msg)
 
 

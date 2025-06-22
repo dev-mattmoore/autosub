@@ -4,3 +4,4 @@ srt
 psutil
 flake8
 black
+colorama
