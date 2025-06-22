@@ -46,7 +46,7 @@ The CLI now supports the following options:
 ### Example Usage
 
 ```bash
-python autosub_cli.py -i "/path/to/video.mkv" --model base --language en --forced True --sdh True
+python autosub_cli.py -i "/path/to/video.mkv" --model base --language en --forced --sdh
 ```
 
 ## License
