@@ -5,6 +5,8 @@ import subprocess
 import srt
 import datetime
 from pathlib import Path
+from concurrent.futures import ProcessPoolExecutor
+import multiprocessing
 
 VIDEO_EXTS = ('.mkv', '.mp4', '.avi', '.mov')
 
@@ -38,47 +40,84 @@ def build_output_path(input_path, language, default, forced, sdh, fmt='srt'):
         suffixes.append('default')
     return f"{base}." + ".".join(suffixes) + f".{fmt}"
 
-def process_file(path, args):
-    output_path = build_output_path(path, args.language, args.default, args.forced, args.sdh, args.output_format)
+def process_file(path, args_dict):
+    language = args_dict['language']
+    model = args_dict['model']
+    output_format = args_dict['output_format']
+    force = args_dict['force']
+    default = args_dict['default']
+    forced = args_dict['forced']
+    sdh = args_dict['sdh']
+
+    output_path = build_output_path(path, language, default, forced, sdh, output_format)
     audio_path = os.path.splitext(path)[0] + "_audio.wav"
 
-    if os.path.exists(output_path) and not args.force:
+    if os.path.exists(output_path) and not force:
         print(f"⏩ Skipping (exists): {Path(path).name}")
         return
 
     print(f"🎞️  Processing: {Path(path).name}")
-    extract_audio(path, audio_path)
-    result = transcribe(audio_path, model_name=args.model, language=args.language)
-    write_srt(result, output_path)
-    os.remove(audio_path)
-    print(f"✅ Done: {Path(output_path).name}")
+    try:
+        extract_audio(path, audio_path)
+        result = transcribe(audio_path, model_name=model, language=language)
+        write_srt(result, output_path)
+        os.remove(audio_path)
+        print(f"✅ Done: {Path(output_path).name}")
+    except Exception as e:
+        print(f"❌ Failed to process {Path(path).name}: {e}")
 
 def main():
-    parser = argparse.ArgumentParser(description="Generate subtitles from video(s) using Whisper")
+    parser = argparse.ArgumentParser(description="Generate subtitles from video(s) using OpenAI Whisper")
     parser.add_argument('--input', '-i', required=True, help='Path to input video file or folder')
     parser.add_argument('--model', '-m', default='base', help='Whisper model size (tiny, base, small, medium, large)')
     parser.add_argument('--language', '-l', default=None, help='Language code (e.g., en, es, fr)')
     parser.add_argument('--output-format', '-f', default='srt', choices=['srt'], help='Subtitle output format')
     parser.add_argument('--force', action='store_true', help='Force overwrite if subtitle already exists')
     parser.add_argument('--default', action='store_true', help='Mark subtitle as default')
-    parser.add_argument('--forced', action='store_true', help='Mark subtitle as forced (used only for non-native dialogue)')
-    parser.add_argument('--sdh', action='store_true', help='Include SDH (Subtitles for Deaf and Hard of Hearing) flag')
+    parser.add_argument('--forced', action='store_true', help='Mark subtitle as forced (non-native dialogue only)')
+    parser.add_argument('--sdh', action='store_true', help='Include SDH (subtitles for the deaf and hard of hearing)')
+    parser.add_argument('--jobs', '-j', type=int, default=max(1, multiprocessing.cpu_count() // 2),
+                        help='Number of parallel processes to use (default: half of CPU cores)')
 
     args = parser.parse_args()
     input_path = Path(args.input)
 
     if input_path.is_file():
-        process_file(str(input_path), args)
+        simple_args = {
+            'language': args.language,
+            'model': args.model,
+            'output_format': args.output_format,
+            'force': args.force,
+            'default': args.default,
+            'forced': args.forced,
+            'sdh': args.sdh
+        }
+        process_file(str(input_path), simple_args)
     elif input_path.is_dir():
         files = [f for f in input_path.iterdir() if f.suffix.lower() in VIDEO_EXTS]
         if not files:
             print(f"⚠️  No video files found in {input_path}")
             return
-        for file in files:
-            try:
-                process_file(str(file), args)
-            except Exception as e:
-                print(f"❌ Error processing {file.name}: {e}")
+
+        print(f"🚀 Processing {len(files)} video(s) with {args.jobs} parallel jobs")
+
+        simple_args = {
+            'language': args.language,
+            'model': args.model,
+            'output_format': args.output_format,
+            'force': args.force,
+            'default': args.default,
+            'forced': args.forced,
+            'sdh': args.sdh
+        }
+
+        with ProcessPoolExecutor(max_workers=args.jobs) as executor:
+            futures = [executor.submit(process_file, str(file), simple_args) for file in files]
+            for future in futures:
+                try:
+                    future.result()
+                except Exception as e:
+                    print(f"❌ Error during batch processing: {e}")
     else:
         print("❌ Input path is invalid.")
 
