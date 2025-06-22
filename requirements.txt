@@ -2,3 +2,5 @@ openai-whisper
 ffmpeg-python
 srt
 psutil
+flake8
+black
