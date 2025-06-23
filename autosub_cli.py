@@ -222,6 +222,7 @@ def process_file(path, args_dict):
     console_print(msg, "info-cyan")
     logger.info(msg)
 
+    import traceback
     while attempts < max_retries:
         try:
             extract_audio(path, audio_path)
@@ -241,17 +242,28 @@ def process_file(path, args_dict):
             console_print(msg, "success")
             logger.info(msg)
             return
+        except subprocess.CalledProcessError as e:
+            attempts += 1
+            msg = f"🔁 Attempt {attempts}/{max_retries} failed (FFmpeg or mkvpropedit error) for {Path(path).name}: {e}"
+        except whisper.WhisperException as e:
+            attempts = max_retries  # Don't retry if Whisper fails deterministically
+            msg = f"🚫 Non-retryable Whisper error for {Path(path).name}: {e}"
+        except MemoryError as e:
+            attempts += 1
+            msg = f"💥 Memory error on attempt {attempts}/{max_retries} for {Path(path).name}: {e}"
         except Exception as e:
             attempts += 1
-            import traceback
-            tb = traceback.format_exc()
-            msg = f"⚠️ Attempt {attempts}/{max_retries} failed for {Path(path).name}: {e}\n{tb}"
-            console_print(msg, "warning")
-            logger.warning(msg)
-            if attempts == max_retries:
-                msg = f"❌ Failed permanently after {max_retries} attempts: {Path(path).name}"
-                console_print(msg, "error")
-                logger.error(msg)
+            msg = f"⚠️ Unknown error on attempt {attempts}/{max_retries} for {Path(path).name}: {e}"
+
+        tb = traceback.format_exc()
+        full_msg = f"{msg}\n{tb}"
+        console_print(full_msg, "warning")
+        logger.warning(full_msg)
+
+        if attempts == max_retries:
+            msg = f"❌ Failed permanently after {max_retries} attempts: {Path(path).name}"
+            console_print(msg, "error")
+            logger.error(msg)
 
 
 def main():
