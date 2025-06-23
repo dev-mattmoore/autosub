@@ -68,16 +68,19 @@ def write_subtitle(result, output_path, fmt):
         f.write(subtitle_text)
 
 
-def set_mkv_subtitle_default(video_path):
+def set_mkv_subtitle_default(video_path, forced=False, sdh=False):
     """
-    Sets the default subtitle track flag on the most recently added subtitle track in an MKV file.
+    Sets the default subtitle track flag on the most recently added subtitle track in an MKV file,
+    with optional forced and SDH flags.
 
     This function uses `mkvmerge` to list subtitle tracks in the specified MKV file and assumes
     the last subtitle track is the one just added. It then uses `mkvpropedit` to set the
-    "default" flag on that track. If no subtitle tracks are found, a warning is logged.
+    "default" flag on that track. Additionally, it can set the "forced" flag and name the track as "SDH".
 
     Args:
         video_path (str): The path to the MKV video file.
+        forced (bool): If True, sets the forced flag on the subtitle track.
+        sdh (bool): If True, sets the name of the subtitle track to "SDH".
 
     Logs:
         - Warning if no subtitle tracks are found or if an error occurs.
@@ -113,12 +116,18 @@ def set_mkv_subtitle_default(video_path):
         last_track_line = subtitle_tracks[-1]
         track_id = last_track_line.split(":")[0].strip().split()[-1]
 
-        subprocess.run([
+        edit_cmd = [
             "mkvpropedit",
             video_path,
             "--edit", f"track:{track_id}",
             "--set", "flag-default=1"
-        ], check=True)
+        ]
+        if forced:
+            edit_cmd.extend(["--set", "flag-forced=1"])
+        if sdh:
+            edit_cmd.extend(["--set", 'name=SDH'])
+
+        subprocess.run(edit_cmd, check=True)
         logging.getLogger().info(f"Set default subtitle track {track_id} in {video_path}")
     except Exception as e:
         logging.getLogger().warning(f"Could not set default subtitle flag: {e}")
@@ -221,7 +230,7 @@ def process_file(path, args_dict):
         output_path = build_output_path(path, language, default, forced, sdh, output_format, output_dir)
         write_subtitle(result, output_path, output_format)
         if default and Path(path).suffix.lower() == ".mkv":
-            set_mkv_subtitle_default(path)
+            set_mkv_subtitle_default(path, forced=forced, sdh=sdh)
         os.remove(audio_path)
         msg = f"✅ Done: {Path(output_path).name}"
         console_print(msg, "success")
