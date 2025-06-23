@@ -11,6 +11,9 @@ import psutil
 import logging
 import sys
 from colorama import init, Fore
+import shutil
+
+MKVMERGE_AVAILABLE = shutil.which("mkvmerge") is not None
 
 # Global variable to control colorized output
 USE_COLOR = True
@@ -63,6 +66,62 @@ def write_subtitle(result, output_path, fmt):
 
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(subtitle_text)
+
+
+def set_mkv_subtitle_default(video_path):
+    """
+    Sets the default subtitle track flag on the most recently added subtitle track in an MKV file.
+
+    This function uses `mkvmerge` to list subtitle tracks in the specified MKV file and assumes
+    the last subtitle track is the one just added. It then uses `mkvpropedit` to set the
+    "default" flag on that track. If no subtitle tracks are found, a warning is logged.
+
+    Args:
+        video_path (str): The path to the MKV video file.
+
+    Logs:
+        - Warning if no subtitle tracks are found or if an error occurs.
+        - Info when the default subtitle track is successfully set.
+
+    Raises:
+        None. All exceptions are caught and logged as warnings.
+    """
+    if not MKVMERGE_AVAILABLE:
+        logging.getLogger().info(
+            "mkvmerge not found; skipping MKV subtitle flag update.\n"
+            "To enable automatic marking of default subtitle tracks in MKV files, install mkvtoolnix:\n"
+            "  Linux:   sudo apt install mkvtoolnix\n"
+            "  macOS:   brew install mkvtoolnix\n"
+            "  Windows: Download from https://mkvtoolnix.download/"
+        )
+        return
+
+    try:
+        result = subprocess.run(
+            ["mkvmerge", "-i", video_path],
+            capture_output=True, text=True, check=True
+        )
+        lines = result.stdout.splitlines()
+        subtitle_tracks = [
+            line for line in lines if "subtitles" in line.lower()
+        ]
+        if not subtitle_tracks:
+            logging.getLogger().warning(f"No subtitle tracks found in {video_path}")
+            return
+
+        # Assume the last subtitle track is the one just added
+        last_track_line = subtitle_tracks[-1]
+        track_id = last_track_line.split(":")[0].strip().split()[-1]
+
+        subprocess.run([
+            "mkvpropedit",
+            video_path,
+            "--edit", f"track:{track_id}",
+            "--set", "flag-default=1"
+        ], check=True)
+        logging.getLogger().info(f"Set default subtitle track {track_id} in {video_path}")
+    except Exception as e:
+        logging.getLogger().warning(f"Could not set default subtitle flag: {e}")
 
 
 def build_output_path(input_path, language, default, forced, sdh, fmt="srt", output_dir=None):
@@ -161,6 +220,8 @@ def process_file(path, args_dict):
         language = detected_lang
         output_path = build_output_path(path, language, default, forced, sdh, output_format, output_dir)
         write_subtitle(result, output_path, output_format)
+        if default and Path(path).suffix.lower() == ".mkv":
+            set_mkv_subtitle_default(path)
         os.remove(audio_path)
         msg = f"✅ Done: {Path(output_path).name}"
         console_print(msg, "success")
