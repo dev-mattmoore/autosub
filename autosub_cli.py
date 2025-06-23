@@ -122,6 +122,7 @@ def process_file(path, args_dict):
     sdh = args_dict["sdh"]
     dry_run = args_dict.get("dry_run", False)
     output_dir = args_dict.get("output_dir")
+    audio_only = args_dict.get("audio_only", False)
     logger = logging.getLogger()
 
     audio_path = os.path.splitext(path)[0] + "_audio.wav"
@@ -144,6 +145,11 @@ def process_file(path, args_dict):
     logger.info(msg)
     try:
         extract_audio(path, audio_path)
+        if audio_only:
+            msg = f"🎧 Audio extracted: {Path(audio_path).name}"
+            console_print(msg, "success")
+            logger.info(msg)
+            return
         result, detected_lang = transcribe(audio_path, model_name=model, language=language)
         language = detected_lang
         output_path = build_output_path(path, language, default, forced, sdh, output_format, output_dir)
@@ -243,6 +249,11 @@ def main():
         default=None,
         help="Optional path to output subtitles separately from input"
     )
+    parser.add_argument(
+        "--audio-only",
+        action="store_true",
+        help="Extract audio only as .wav and skip transcription"
+    )
 
     args = parser.parse_args()
 
@@ -293,6 +304,7 @@ def main():
             "sdh": args.sdh,
             "dry_run": args.dry_run,
             "output_dir": args.output_dir,
+            "audio_only": args.audio_only,
         }
         process_file(str(input_path), simple_args)
     elif input_path.is_dir():
@@ -317,6 +329,7 @@ def main():
             "sdh": args.sdh,
             "dry_run": args.dry_run,
             "output_dir": args.output_dir,
+            "audio_only": args.audio_only,
         }
 
         logger.info("Batch processing started.")
