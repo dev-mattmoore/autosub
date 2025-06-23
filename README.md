@@ -62,6 +62,7 @@ python autosub_cli.py -i <folder_with_videos>
 - `--audio-only`: Extract audio only as .wav and skip transcription.
 - `--audio-output-dir`: Optional path to save extracted audio separately from input.
 - `--quiet-filenames`: Suppress per-file progress logging in batch mode.
+- `--max-retries`: Max retry attempts per file on failure (default: 3).
 
 ## Output Naming
 

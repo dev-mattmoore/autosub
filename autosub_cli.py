@@ -194,6 +194,9 @@ def process_file(path, args_dict):
     audio_output_dir = args_dict.get("audio_output_dir")
     logger = logging.getLogger()
 
+    max_retries = args_dict.get("max_retries", 3)
+    attempts = 0
+
     # Ensure output directories exist
     for dir_path in (output_dir, audio_output_dir):
         if dir_path:
@@ -218,30 +221,37 @@ def process_file(path, args_dict):
     msg = f"🎞️  Processing: {Path(path).name}"
     console_print(msg, "info-cyan")
     logger.info(msg)
-    try:
-        extract_audio(path, audio_path)
-        if audio_only:
-            msg = f"🎧 Audio extracted: {Path(audio_path).name}"
+
+    while attempts < max_retries:
+        try:
+            extract_audio(path, audio_path)
+            if audio_only:
+                msg = f"🎧 Audio extracted: {Path(audio_path).name}"
+                console_print(msg, "success")
+                logger.info(msg)
+                return
+            result, detected_lang = transcribe(audio_path, model_name=model, language=language)
+            language = detected_lang
+            output_path = build_output_path(path, language, default, forced, sdh, output_format, output_dir)
+            write_subtitle(result, output_path, output_format)
+            if default and Path(path).suffix.lower() == ".mkv":
+                set_mkv_subtitle_default(path, forced=forced, sdh=sdh)
+            os.remove(audio_path)
+            msg = f"✅ Done: {Path(output_path).name}"
             console_print(msg, "success")
             logger.info(msg)
             return
-        result, detected_lang = transcribe(audio_path, model_name=model, language=language)
-        language = detected_lang
-        output_path = build_output_path(path, language, default, forced, sdh, output_format, output_dir)
-        write_subtitle(result, output_path, output_format)
-        if default and Path(path).suffix.lower() == ".mkv":
-            set_mkv_subtitle_default(path, forced=forced, sdh=sdh)
-        os.remove(audio_path)
-        msg = f"✅ Done: {Path(output_path).name}"
-        console_print(msg, "success")
-        logger.info(msg)
-    except Exception as e:
-        import traceback
-
-        tb = traceback.format_exc()
-        msg = f"❌ Failed to process {Path(path).name}: {e}\n{tb}"
-        console_print(msg, "error")
-        logger.error(msg)
+        except Exception as e:
+            attempts += 1
+            import traceback
+            tb = traceback.format_exc()
+            msg = f"⚠️ Attempt {attempts}/{max_retries} failed for {Path(path).name}: {e}\n{tb}"
+            console_print(msg, "warning")
+            logger.warning(msg)
+            if attempts == max_retries:
+                msg = f"❌ Failed permanently after {max_retries} attempts: {Path(path).name}"
+                console_print(msg, "error")
+                logger.error(msg)
 
 
 def main():
@@ -342,6 +352,12 @@ def main():
         action="store_true",
         help="Suppress per-file progress logging in batch mode"
     )
+    parser.add_argument(
+        "--max-retries",
+        type=int,
+        default=3,
+        help="Max retry attempts per file on failure (default: 3)"
+    )
 
     args = parser.parse_args()
 
@@ -395,6 +411,7 @@ def main():
             "audio_only": args.audio_only,
             "audio_output_dir": args.audio_output_dir,
             "quiet_filenames": args.quiet_filenames,
+            "max_retries": args.max_retries,
         }
         process_file(str(input_path), simple_args)
     elif input_path.is_dir():
@@ -422,6 +439,7 @@ def main():
             "audio_only": args.audio_only,
             "audio_output_dir": args.audio_output_dir,
             "quiet_filenames": args.quiet_filenames,
+            "max_retries": args.max_retries,
         }
 
         logger.info("Batch processing started.")
