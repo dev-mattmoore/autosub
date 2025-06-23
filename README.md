@@ -58,6 +58,7 @@ python autosub_cli.py -i <folder_with_videos>
 - `--logfile`: Path to log file (default: `autosub.log`).
 - `--no-logfile`: Disable all logging to file (only console output).
 - `--no-color`: Disable colorized console output.
+- `--output-dir`: Optional path to output subtitles separately from input.
 
 ## Output Naming
 

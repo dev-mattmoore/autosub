@@ -59,8 +59,8 @@ def write_subtitle(result, output_path, fmt):
         f.write(subtitle_text)
 
 
-def build_output_path(input_path, language, default, forced, sdh, fmt="srt"):
-    base = os.path.splitext(input_path)[0]
+def build_output_path(input_path, language, default, forced, sdh, fmt="srt", output_dir=None):
+    base_name = Path(input_path).stem
     suffixes = [language or "und"]
     if forced:
         suffixes.append("forced")
@@ -68,7 +68,8 @@ def build_output_path(input_path, language, default, forced, sdh, fmt="srt"):
         suffixes.append("sdh")
     if default:
         suffixes.append("default")
-    return f"{base}." + ".".join(suffixes) + f".{fmt}"
+    filename = f"{base_name}." + ".".join(suffixes) + f".{fmt}"
+    return str(Path(output_dir) / filename) if output_dir else f"{os.path.splitext(input_path)[0]}." + ".".join(suffixes) + f".{fmt}"
 
 
 def setup_logging(logfile):
@@ -114,8 +115,9 @@ def process_file(path, args_dict):
     forced = args_dict["forced"]
     sdh = args_dict["sdh"]
     dry_run = args_dict.get("dry_run", False)
+    output_dir = args_dict.get("output_dir")
     logger = logging.getLogger()
-    output_path = build_output_path(path, language, default, forced, sdh, output_format)
+    output_path = build_output_path(path, language, default, forced, sdh, output_format, output_dir)
 
     if dry_run:
         msg = f"📝 Would process: {Path(path).name} -> {Path(output_path).name}"
@@ -227,6 +229,12 @@ def main():
         action="store_true",
         help="Disable colorized console output"
     )
+    parser.add_argument(
+        "--output-dir",
+        type=str,
+        default=None,
+        help="Optional path to output subtitles separately from input"
+    )
 
     args = parser.parse_args()
 
@@ -276,6 +284,7 @@ def main():
             "forced": args.forced,
             "sdh": args.sdh,
             "dry_run": args.dry_run,
+            "output_dir": args.output_dir,
         }
         process_file(str(input_path), simple_args)
     elif input_path.is_dir():
@@ -299,6 +308,7 @@ def main():
             "forced": args.forced,
             "sdh": args.sdh,
             "dry_run": args.dry_run,
+            "output_dir": args.output_dir,
         }
 
         logger.info("Batch processing started.")
