@@ -195,6 +195,7 @@ def process_file(path, args_dict):
     logger = logging.getLogger()
 
     max_retries = args_dict.get("max_retries", 3)
+    max_backoff = args_dict.get("max_backoff", 30)
     attempts = 0
 
     # Ensure output directories exist
@@ -264,6 +265,11 @@ def process_file(path, args_dict):
             msg = f"❌ Failed permanently after {max_retries} attempts: {Path(path).name}"
             console_print(msg, "error")
             logger.error(msg)
+        else:
+            # Exponential backoff, but capped at max_backoff seconds
+            backoff_time = min(2 ** attempts, max_backoff)
+            import time
+            time.sleep(backoff_time)
 
 
 def main():
@@ -370,6 +376,12 @@ def main():
         default=3,
         help="Max retry attempts per file on failure (default: 3)"
     )
+    parser.add_argument(
+        "--max-backoff",
+        type=int,
+        default=30,
+        help="Maximum wait time (in seconds) between retries (default: 30)"
+    )
 
     args = parser.parse_args()
 
@@ -424,6 +436,7 @@ def main():
             "audio_output_dir": args.audio_output_dir,
             "quiet_filenames": args.quiet_filenames,
             "max_retries": args.max_retries,
+            "max_backoff": args.max_backoff,
         }
         process_file(str(input_path), simple_args)
     elif input_path.is_dir():
@@ -452,6 +465,7 @@ def main():
             "audio_output_dir": args.audio_output_dir,
             "quiet_filenames": args.quiet_filenames,
             "max_retries": args.max_retries,
+            "max_backoff": args.max_backoff,
         }
 
         logger.info("Batch processing started.")

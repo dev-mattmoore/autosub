@@ -63,6 +63,7 @@ python autosub_cli.py -i <folder_with_videos>
 - `--audio-output-dir`: Optional path to save extracted audio separately from input.
 - `--quiet-filenames`: Suppress per-file progress logging in batch mode.
 - `--max-retries`: Max retry attempts per file on failure (default: 3).
+- `--max-backoff`: Maximum wait time (in seconds) between retries (default: 30).
 
 ## Output Naming
 
