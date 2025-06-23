@@ -39,7 +39,13 @@ def extract_audio(video_path, audio_path):
 
 def transcribe(audio_path, model_name="base", language=None):
     model = whisper.load_model(model_name)
-    return model.transcribe(audio_path, language=language)
+    result = model.transcribe(audio_path, language=language)
+    detected_lang = language
+    if language is None:
+        detected_lang = result.get("language", "und")
+        print(f"🧠 Detected language: {detected_lang}")
+        logging.getLogger().info(f"Detected language for {audio_path}: {detected_lang}")
+    return result, detected_lang
 
 
 def write_subtitle(result, output_path, fmt):
@@ -117,17 +123,17 @@ def process_file(path, args_dict):
     dry_run = args_dict.get("dry_run", False)
     output_dir = args_dict.get("output_dir")
     logger = logging.getLogger()
-    output_path = build_output_path(path, language, default, forced, sdh, output_format, output_dir)
+
+    audio_path = os.path.splitext(path)[0] + "_audio.wav"
 
     if dry_run:
+        output_path = build_output_path(path, language, default, forced, sdh, output_format, output_dir)
         msg = f"📝 Would process: {Path(path).name} -> {Path(output_path).name}"
         console_print(msg, "warning")
         logger.info(msg)
         return
 
-    audio_path = os.path.splitext(path)[0] + "_audio.wav"
-
-    if os.path.exists(output_path) and not force:
+    if os.path.exists(build_output_path(path, language, default, forced, sdh, output_format, output_dir)) and not force:
         msg = f"⏩ Skipping (exists): {Path(path).name}"
         console_print(msg, "warning")
         logger.info(msg)
@@ -138,7 +144,9 @@ def process_file(path, args_dict):
     logger.info(msg)
     try:
         extract_audio(path, audio_path)
-        result = transcribe(audio_path, model_name=model, language=language)
+        result, detected_lang = transcribe(audio_path, model_name=model, language=language)
+        language = detected_lang
+        output_path = build_output_path(path, language, default, forced, sdh, output_format, output_dir)
         write_subtitle(result, output_path, output_format)
         os.remove(audio_path)
         msg = f"✅ Done: {Path(output_path).name}"
