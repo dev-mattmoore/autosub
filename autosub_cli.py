@@ -3,7 +3,7 @@ import argparse
 import whisper
 import subprocess
 import srt
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor
 import multiprocessing
@@ -54,8 +54,8 @@ def transcribe(audio_path, model_name="base", language=None):
 def write_subtitle(result, output_path, fmt):
     subtitles = []
     for i, seg in enumerate(result["segments"]):
-        start = datetime.timedelta(seconds=seg["start"])
-        end = datetime.timedelta(seconds=seg["end"])
+        start = timedelta(seconds=seg["start"])
+        end = timedelta(seconds=seg["end"])
         subtitles.append(
             srt.Subtitle(index=i + 1, start=start, end=end, content=seg["text"])
         )
@@ -246,9 +246,6 @@ def process_file(path, args_dict):
         except subprocess.CalledProcessError as e:
             attempts += 1
             msg = f"🔁 Attempt {attempts}/{max_retries} failed (FFmpeg or mkvpropedit error) for {Path(path).name}: {e}"
-        except whisper.WhisperException as e:
-            attempts = max_retries  # Don't retry if Whisper fails deterministically
-            msg = f"🚫 Non-retryable Whisper error for {Path(path).name}: {e}"
         except MemoryError as e:
             attempts += 1
             msg = f"💥 Memory error on attempt {attempts}/{max_retries} for {Path(path).name}: {e}"
