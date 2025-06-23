@@ -60,6 +60,7 @@ python autosub_cli.py -i <folder_with_videos>
 - `--no-color`: Disable colorized console output.
 - `--output-dir`: Optional path to output subtitles separately from input.
 - `--audio-only`: Extract audio only as .wav and skip transcription.
+- `--audio-output-dir`: Optional path to save extracted audio separately from input.
 
 ## Output Naming
 

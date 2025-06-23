@@ -123,9 +123,16 @@ def process_file(path, args_dict):
     dry_run = args_dict.get("dry_run", False)
     output_dir = args_dict.get("output_dir")
     audio_only = args_dict.get("audio_only", False)
+    audio_output_dir = args_dict.get("audio_output_dir")
     logger = logging.getLogger()
 
-    audio_path = os.path.splitext(path)[0] + "_audio.wav"
+    # Ensure output directories exist
+    for dir_path in (output_dir, audio_output_dir):
+        if dir_path:
+            Path(dir_path).mkdir(parents=True, exist_ok=True)
+
+    base_audio_name = Path(path).stem + "_audio.wav"
+    audio_path = str(Path(audio_output_dir) / base_audio_name) if audio_output_dir else os.path.splitext(path)[0] + "_audio.wav"
 
     if dry_run:
         output_path = build_output_path(path, language, default, forced, sdh, output_format, output_dir)
@@ -254,6 +261,12 @@ def main():
         action="store_true",
         help="Extract audio only as .wav and skip transcription"
     )
+    parser.add_argument(
+        "--audio-output-dir",
+        type=str,
+        default=None,
+        help="Optional path to save extracted audio separately from input"
+    )
 
     args = parser.parse_args()
 
@@ -305,6 +318,7 @@ def main():
             "dry_run": args.dry_run,
             "output_dir": args.output_dir,
             "audio_only": args.audio_only,
+            "audio_output_dir": args.audio_output_dir,
         }
         process_file(str(input_path), simple_args)
     elif input_path.is_dir():
@@ -330,6 +344,7 @@ def main():
             "dry_run": args.dry_run,
             "output_dir": args.output_dir,
             "audio_only": args.audio_only,
+            "audio_output_dir": args.audio_output_dir,
         }
 
         logger.info("Batch processing started.")
