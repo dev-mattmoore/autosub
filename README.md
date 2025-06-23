@@ -48,7 +48,7 @@ python autosub_cli.py -i <folder_with_videos>
 - `--input`, `-i`: Path to the input video file or folder.
 - `--model`, `-m`: Whisper model size (`tiny`, `base`, `small`, `medium`, `large`). Default: `base`.
 - `--language`, `-l`: Language code (e.g., `en`, `es`, `fr`). Default: auto-detect.
-- `--output-format`, `-f`: Subtitle output format (currently only `srt` supported).
+- `--output-format`, `-f`: Subtitle output format (`srt` or `vtt`). Default: `srt`.
 - `--force`: Force overwrite if subtitle already exists.
 - `--default`: Mark subtitles as default.
 - `--forced`: Mark subtitles as forced (non-native dialogue only).
@@ -63,11 +63,12 @@ python autosub_cli.py -i <folder_with_videos>
 
 Output subtitle files are named using the following pattern:
 ```
-<basename>.<language>[.forced][.sdh][.default].srt
+<basename>.<language>[.forced][.sdh][.default].<format>
 ```
 For example:
 ```
 movie.en.forced.sdh.default.srt
+movie.en.forced.sdh.default.vtt
 ```
 
 ## Example Usage

@@ -42,7 +42,7 @@ def transcribe(audio_path, model_name="base", language=None):
     return model.transcribe(audio_path, language=language)
 
 
-def write_srt(result, output_path):
+def write_subtitle(result, output_path, fmt):
     subtitles = []
     for i, seg in enumerate(result["segments"]):
         start = datetime.timedelta(seconds=seg["start"])
@@ -50,8 +50,13 @@ def write_srt(result, output_path):
         subtitles.append(
             srt.Subtitle(index=i + 1, start=start, end=end, content=seg["text"])
         )
+    subtitle_text = srt.compose(subtitles)
+
+    if fmt == "vtt":
+        subtitle_text = "WEBVTT\n\n" + subtitle_text.replace(",", ".")
+
     with open(output_path, "w", encoding="utf-8") as f:
-        f.write(srt.compose(subtitles))
+        f.write(subtitle_text)
 
 
 def build_output_path(input_path, language, default, forced, sdh, fmt="srt"):
@@ -132,7 +137,7 @@ def process_file(path, args_dict):
     try:
         extract_audio(path, audio_path)
         result = transcribe(audio_path, model_name=model, language=language)
-        write_srt(result, output_path)
+        write_subtitle(result, output_path, output_format)
         os.remove(audio_path)
         msg = f"✅ Done: {Path(output_path).name}"
         console_print(msg, "success")
@@ -173,8 +178,8 @@ def main():
         "--output-format",
         "-f",
         default="srt",
-        choices=["srt"],
-        help="Subtitle output format",
+        choices=["srt", "vtt"],
+        help="Subtitle output format (srt or vtt)",
     )
     parser.add_argument(
         "--force",
