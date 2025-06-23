@@ -337,6 +337,11 @@ def main():
         default=None,
         help="Optional path to save extracted audio separately from input"
     )
+    parser.add_argument(
+        "--quiet-filenames",
+        action="store_true",
+        help="Suppress per-file progress logging in batch mode"
+    )
 
     args = parser.parse_args()
 
@@ -389,6 +394,7 @@ def main():
             "output_dir": args.output_dir,
             "audio_only": args.audio_only,
             "audio_output_dir": args.audio_output_dir,
+            "quiet_filenames": args.quiet_filenames,
         }
         process_file(str(input_path), simple_args)
     elif input_path.is_dir():
@@ -415,14 +421,19 @@ def main():
             "output_dir": args.output_dir,
             "audio_only": args.audio_only,
             "audio_output_dir": args.audio_output_dir,
+            "quiet_filenames": args.quiet_filenames,
         }
 
         logger.info("Batch processing started.")
+        from tqdm import tqdm
         with ProcessPoolExecutor(max_workers=args.jobs) as executor:
             futures = [
                 executor.submit(process_file, str(file), simple_args) for file in files
             ]
-            for future in futures:
+            for i, future in enumerate(tqdm(futures, desc="Batch progress", unit="file")):
+                file_name = files[i].name
+                if not args.quiet_filenames:
+                    tqdm.write(f"⏳ Processing: {file_name}")
                 try:
                     future.result()
                 except Exception as e:

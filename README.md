@@ -61,6 +61,7 @@ python autosub_cli.py -i <folder_with_videos>
 - `--output-dir`: Optional path to output subtitles separately from input.
 - `--audio-only`: Extract audio only as .wav and skip transcription.
 - `--audio-output-dir`: Optional path to save extracted audio separately from input.
+- `--quiet-filenames`: Suppress per-file progress logging in batch mode.
 
 ## Output Naming
 
