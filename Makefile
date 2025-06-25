@@ -1,6 +1,6 @@
 # Makefile for AutoSub
 
-.PHONY: help install lint format test clean run tail
+.PHONY: help install activate lint format test clean run tail
 
 help:
 	@echo "AutoSub Makefile commands:"
@@ -14,6 +14,9 @@ help:
 install:
 	python3 -m venv venv
 	. venv/bin/activate && pip install --upgrade pip && pip install -r requirements.txt
+
+activate:
+	. venv/bin/activate
 
 lint:
 	. venv/bin/activate && flake8 autosub_cli.py

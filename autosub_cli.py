@@ -12,6 +12,8 @@ import logging
 import sys
 from colorama import init, Fore
 import shutil
+import time
+import concurrent.futures
 
 MKVMERGE_AVAILABLE = shutil.which("mkvmerge") is not None
 
@@ -158,11 +160,6 @@ def setup_logging(logfile):
         fh.setFormatter(formatter)
         logger.addHandler(fh)
 
-    ch = logging.StreamHandler(sys.stdout)
-    ch.setLevel(logging.INFO)
-    ch.setFormatter(formatter)
-    logger.addHandler(ch)
-
 
 def console_print(msg, level="info"):
     if not USE_COLOR:
@@ -226,6 +223,7 @@ def process_file(path, args_dict):
     import traceback
     while attempts < max_retries:
         try:
+            start_time = time.time()
             extract_audio(path, audio_path)
             if audio_only:
                 msg = f"🎧 Audio extracted: {Path(audio_path).name}"
@@ -239,6 +237,13 @@ def process_file(path, args_dict):
             if default and Path(path).suffix.lower() == ".mkv":
                 set_mkv_subtitle_default(path, forced=forced, sdh=sdh)
             os.remove(audio_path)
+            end_time = time.time()
+            duration_sec = end_time - start_time
+            video_duration = result.get("duration", None)
+            speed_ratio = round(video_duration / duration_sec, 2) if video_duration else "N/A"
+            timing_msg = f"⏱️  {Path(output_path).name} took {duration_sec:.2f}s (Speed: {speed_ratio}x)"
+            console_print(timing_msg, "info-cyan")
+            logger.info(timing_msg)
             msg = f"✅ Done: {Path(output_path).name}"
             console_print(msg, "success")
             logger.info(msg)
@@ -265,7 +270,6 @@ def process_file(path, args_dict):
         else:
             # Exponential backoff, but capped at max_backoff seconds
             backoff_time = min(2 ** attempts, max_backoff)
-            import time
             time.sleep(backoff_time)
 
 
@@ -416,6 +420,13 @@ def main():
         console_print(msg, "info-cyan")
         logger.info(msg)
 
+    # Warn if available memory is low
+    avail_mem_gb = psutil.virtual_memory().available / (1024**3)
+    if avail_mem_gb < 2 * args.jobs:
+        warn_msg = f"⚠️  Low available memory ({avail_mem_gb:.1f} GB) for {args.jobs} jobs. Consider reducing --jobs or using a smaller model."
+        console_print(warn_msg, "warning")
+        logger.warning(warn_msg)
+
     input_path = Path(args.input)
 
     if input_path.is_file():
@@ -465,25 +476,59 @@ def main():
             "max_backoff": args.max_backoff,
         }
 
-        logger.info("Batch processing started.")
-        from tqdm import tqdm
-        with ProcessPoolExecutor(max_workers=args.jobs) as executor:
-            futures = [
-                executor.submit(process_file, str(file), simple_args) for file in files
-            ]
-            for i, future in enumerate(tqdm(futures, desc="Batch progress", unit="file")):
-                file_name = files[i].name
-                if not args.quiet_filenames:
-                    tqdm.write(f"⏳ Processing: {file_name}")
-                try:
-                    future.result()
-                except Exception as e:
-                    import traceback
+        # Batch summary stats
+        summary_stats = {
+            "total": len(files),
+            "success": 0,
+            "fail": 0,
+            "timings": [],
+        }
 
-                    tb = traceback.format_exc()
-                    msg = f"❌ Error during batch processing: {e}\n{tb}"
-                    console_print(msg, "error")
-                    logger.error(msg)
+        logger.info("Batch processing started.")
+        try:
+            from tqdm import tqdm
+            with ProcessPoolExecutor(max_workers=args.jobs) as executor:
+                futures = [
+                    executor.submit(process_file, str(file), simple_args) for file in files
+                ]
+                progress_bar = tqdm(
+                    total=len(futures),
+                    desc="Batch progress",
+                    unit="file",
+                    position=1,
+                    leave=True,
+                    dynamic_ncols=True
+                )
+                for i, future in enumerate(futures):
+                    file_name = files[i].name
+                    if not args.quiet_filenames:
+                        tqdm.write(f"⏳ Processing: {file_name}", file=sys.stdout)
+                    try:
+                        future.result()
+                        summary_stats["success"] += 1
+                    except Exception as e:
+                        import traceback
+                        tb = traceback.format_exc()
+                        msg = f"❌ Error during batch processing: {e}\n{tb}"
+                        console_print(msg, "error")
+                        logger.error(msg)
+                        summary_stats["fail"] += 1
+                    progress_bar.update(1)
+                    progress_bar.set_postfix_str(f"{progress_bar.n}/{progress_bar.total}")
+                progress_bar.close()
+        except concurrent.futures.process.BrokenProcessPool as e:
+            err_msg = ("❌ Batch processing failed: A process in the pool was terminated abruptly. "
+                       "This may be due to running out of memory or a crash in a worker process.\n"
+                       "Try reducing --jobs or using a smaller model.")
+            console_print(err_msg, "error")
+            logger.error(err_msg)
+        # Print and log batch summary
+        total = summary_stats["total"]
+        success = summary_stats["success"]
+        fail = summary_stats["fail"]
+        summary_msg = f"\n📊 Summary: {success}/{total} succeeded, {fail} failed"
+        console_print(summary_msg, "info-cyan")
+        logger.info(summary_msg)
         logger.info("Batch processing finished.")
     else:
         msg = "❌ Input path is invalid."
