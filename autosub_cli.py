@@ -14,6 +14,7 @@ from colorama import init, Fore
 import shutil
 import time
 import concurrent.futures
+import toml
 
 MKVMERGE_AVAILABLE = shutil.which("mkvmerge") is not None
 
@@ -276,7 +277,12 @@ def process_file(path, args_dict):
 def main():
     init(autoreset=True)
     parser = argparse.ArgumentParser(
-        description="Generate subtitles from video(s) using OpenAI Whisper"
+        description="Generate subtitles from video(s) using OpenAI Whisper (configurable via ~/.autosubrc)"
+    )
+    parser.add_argument(
+        "--print-config",
+        action="store_true",
+        help="Print merged configuration from CLI and config file, then exit"
     )
     parser.add_argument(
         "--input",
@@ -386,19 +392,31 @@ def main():
 
     args = parser.parse_args()
 
+    # Optional config file at ~/.autosubrc in TOML format, e.g.:
+    config_path = Path.home() / ".autosubrc"
+    config_defaults = {}
+    if config_path.exists():
+        try:
+            config_defaults = toml.load(config_path)
+            console_print(f"📁 Loaded config defaults from {config_path}", "info-cyan")
+        except Exception as e:
+            console_print(f"⚠️  Failed to parse config file: {e}", "warning")
+
     global USE_COLOR
     USE_COLOR = not args.no_color
 
     if args.no_logfile:
         setup_logging(None)
     else:
+        # Ensure the log directory exists before writing logs
+        Path(args.logdir).mkdir(parents=True, exist_ok=True)
         if args.logfile == "autosub.log":
             timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-            args.logfile = f"autosub-{timestamp}.log"
+            args.logfile = str(Path(args.logdir) / f"autosub-{timestamp}.log")
         setup_logging(args.logfile)
 
         # Create or update symlink to latest log file
-        latest_symlink = Path("autosub-latest.log")
+        latest_symlink = Path(args.logdir) / "autosub-latest.log"
         try:
             if latest_symlink.exists() or latest_symlink.is_symlink():
                 latest_symlink.unlink()
@@ -431,21 +449,26 @@ def main():
 
     if input_path.is_file():
         simple_args = {
-            "language": args.language,
-            "model": args.model,
-            "output_format": args.output_format,
-            "force": args.force,
-            "default": args.default,
-            "forced": args.forced,
-            "sdh": args.sdh,
-            "dry_run": args.dry_run,
-            "output_dir": args.output_dir,
-            "audio_only": args.audio_only,
-            "audio_output_dir": args.audio_output_dir,
-            "quiet_filenames": args.quiet_filenames,
-            "max_retries": args.max_retries,
-            "max_backoff": args.max_backoff,
+            "language": args.language or config_defaults.get("language"),
+            "model": args.model or config_defaults.get("model", "base"),
+            "output_format": args.output_format or config_defaults.get("output_format", "srt"),
+            "force": args.force or config_defaults.get("force", False),
+            "default": args.default or config_defaults.get("default", False),
+            "forced": args.forced or config_defaults.get("forced", False),
+            "sdh": args.sdh or config_defaults.get("sdh", False),
+            "dry_run": args.dry_run or config_defaults.get("dry_run", False),
+            "output_dir": args.output_dir or config_defaults.get("output_dir"),
+            "audio_only": args.audio_only or config_defaults.get("audio_only", False),
+            "audio_output_dir": args.audio_output_dir or config_defaults.get("audio_output_dir"),
+            "quiet_filenames": args.quiet_filenames or config_defaults.get("quiet_filenames", False),
+            "max_retries": args.max_retries or config_defaults.get("max_retries", 3),
+            "max_backoff": args.max_backoff or config_defaults.get("max_backoff", 30),
         }
+        if args.print_config:
+            print("🔧 Effective Configuration:")
+            for k, v in simple_args.items():
+                print(f"{k}: {v}")
+            return
         process_file(str(input_path), simple_args)
     elif input_path.is_dir():
         files = [f for f in input_path.iterdir() if f.suffix.lower() in VIDEO_EXTS]
@@ -460,21 +483,26 @@ def main():
         logger.info(msg)
 
         simple_args = {
-            "language": args.language,
-            "model": args.model,
-            "output_format": args.output_format,
-            "force": args.force,
-            "default": args.default,
-            "forced": args.forced,
-            "sdh": args.sdh,
-            "dry_run": args.dry_run,
-            "output_dir": args.output_dir,
-            "audio_only": args.audio_only,
-            "audio_output_dir": args.audio_output_dir,
-            "quiet_filenames": args.quiet_filenames,
-            "max_retries": args.max_retries,
-            "max_backoff": args.max_backoff,
+            "language": args.language or config_defaults.get("language"),
+            "model": args.model or config_defaults.get("model", "base"),
+            "output_format": args.output_format or config_defaults.get("output_format", "srt"),
+            "force": args.force or config_defaults.get("force", False),
+            "default": args.default or config_defaults.get("default", False),
+            "forced": args.forced or config_defaults.get("forced", False),
+            "sdh": args.sdh or config_defaults.get("sdh", False),
+            "dry_run": args.dry_run or config_defaults.get("dry_run", False),
+            "output_dir": args.output_dir or config_defaults.get("output_dir"),
+            "audio_only": args.audio_only or config_defaults.get("audio_only", False),
+            "audio_output_dir": args.audio_output_dir or config_defaults.get("audio_output_dir"),
+            "quiet_filenames": args.quiet_filenames or config_defaults.get("quiet_filenames", False),
+            "max_retries": args.max_retries or config_defaults.get("max_retries", 3),
+            "max_backoff": args.max_backoff or config_defaults.get("max_backoff", 30),
         }
+        if args.print_config:
+            print("🔧 Effective Configuration:")
+            for k, v in simple_args.items():
+                print(f"{k}: {v}")
+            return
 
         # Batch summary stats
         summary_stats = {

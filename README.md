@@ -64,6 +64,11 @@ python autosub_cli.py -i <folder_with_videos>
 - `--quiet-filenames`: Suppress per-file progress logging in batch mode.
 - `--max-retries`: Max retry attempts per file on failure (default: 3).
 - `--max-backoff`: Maximum wait time (in seconds) between retries (default: 30).
+- `--print-config`: Print merged configuration from CLI and config file, then exit.
+
+## Configuration File
+
+You can set default options in a `~/.autosubrc` config file (TOML format). CLI arguments always override config file values. Use `--print-config` to show the effective configuration.
 
 ## Output Naming
 
