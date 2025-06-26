@@ -15,6 +15,7 @@ import shutil
 import time
 import concurrent.futures
 import toml
+from happytransformer import HappyTextToText
 
 MKVMERGE_AVAILABLE = shutil.which("mkvmerge") is not None
 
@@ -235,6 +236,42 @@ def process_file(path, args_dict):
             language = detected_lang
             output_path = build_output_path(path, language, default, forced, sdh, output_format, output_dir)
             write_subtitle(result, output_path, output_format)
+            # Local grammar correction post-processing
+            if args_dict.get("postprocess_local"):
+                try:
+                    msg = "✏️  Post-processing subtitles for grammar correction..."
+                    console_print(msg, "info-cyan")
+                    logger.info(msg)
+                    corrector = HappyTextToText("T5", "vennify/t5-base-grammar-correction")
+                    with open(output_path, "r", encoding="utf-8") as f:
+                        original = f.read()
+
+                    import re
+                    def correct_srt(text):
+                        blocks = re.split(r"\n\s*\n", text.strip())
+                        corrected_blocks = []
+                        for block in blocks:
+                            lines = block.split("\n")
+                            if len(lines) >= 3:
+                                text_line = " ".join(lines[2:])
+                                corrected = corrector.generate_text(text_line).text
+                                corrected_block = "\n".join(lines[:2] + [corrected])
+                                corrected_blocks.append(corrected_block)
+                            else:
+                                corrected_blocks.append(block)
+                        return "\n\n".join(corrected_blocks)
+
+                    corrected_text = correct_srt(original)
+                    with open(output_path, "w", encoding="utf-8") as f:
+                        f.write(corrected_text)
+
+                    msg = "✅ Grammar correction complete"
+                    console_print(msg, "success")
+                    logger.info(msg)
+                except Exception as e:
+                    msg = f"⚠️  Failed to post-process subtitles: {e}"
+                    console_print(msg, "warning")
+                    logger.warning(msg)
             if default and Path(path).suffix.lower() == ".mkv":
                 set_mkv_subtitle_default(path, forced=forced, sdh=sdh)
             os.remove(audio_path)
@@ -401,6 +438,11 @@ def main():
         default=0,
         help="Delay in seconds between batches (default: 0)"
     )
+    parser.add_argument(
+        "--postprocess-local",
+        action="store_true",
+        help="Enable local grammar correction of subtitles using a lightweight language model"
+    )
 
     args = parser.parse_args()
 
@@ -475,6 +517,7 @@ def main():
             "quiet_filenames": args.quiet_filenames or config_defaults.get("quiet_filenames", False),
             "max_retries": args.max_retries or config_defaults.get("max_retries", 3),
             "max_backoff": args.max_backoff or config_defaults.get("max_backoff", 30),
+            "postprocess_local": args.postprocess_local or config_defaults.get("postprocess_local", False),
         }
         if args.print_config:
             print("🔧 Effective Configuration:")
@@ -509,6 +552,7 @@ def main():
             "quiet_filenames": args.quiet_filenames or config_defaults.get("quiet_filenames", False),
             "max_retries": args.max_retries or config_defaults.get("max_retries", 3),
             "max_backoff": args.max_backoff or config_defaults.get("max_backoff", 30),
+            "postprocess_local": args.postprocess_local or config_defaults.get("postprocess_local", False),
         }
         if args.print_config:
             print("🔧 Effective Configuration:")

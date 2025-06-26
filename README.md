@@ -67,6 +67,7 @@ python autosub_cli.py -i <folder_with_videos>
 - `--print-config`: Print merged configuration from CLI and config file, then exit.
 - `--batch-size`: Number of files to process at once in batch mode (0 = no limit).
 - `--batch-delay`: Delay in seconds between batches (default: 0).
+- `--postprocess-local`: Enable local grammar correction of subtitles using a lightweight language model (requires happytransformer and T5 model).
 
 ## Configuration File
 
@@ -94,6 +95,7 @@ no_color = false
 jobs = 0
 batch_size = 1
 batch_delay = 30
+postprocess_local = false
 ```
 
 ## Output Naming
