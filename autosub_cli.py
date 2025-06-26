@@ -389,6 +389,18 @@ def main():
         default=30,
         help="Maximum wait time (in seconds) between retries (default: 30)"
     )
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=0,
+        help="Number of files to process at once (0 = no limit)"
+    )
+    parser.add_argument(
+        "--batch-delay",
+        type=int,
+        default=0,
+        help="Delay in seconds between batches (default: 0)"
+    )
 
     args = parser.parse_args()
 
@@ -408,15 +420,15 @@ def main():
     if args.no_logfile:
         setup_logging(None)
     else:
-        # Ensure the log directory exists before writing logs
-        Path(args.logdir).mkdir(parents=True, exist_ok=True)
+        logdir = "."
         if args.logfile == "autosub.log":
             timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-            args.logfile = str(Path(args.logdir) / f"autosub-{timestamp}.log")
-        setup_logging(args.logfile)
+            args.logfile = f"autosub-{timestamp}.log"
+        Path(logdir).mkdir(parents=True, exist_ok=True)
+        setup_logging(os.path.join(logdir, args.logfile))
 
         # Create or update symlink to latest log file
-        latest_symlink = Path(args.logdir) / "autosub-latest.log"
+        latest_symlink = Path(logdir) / "autosub-latest.log"
         try:
             if latest_symlink.exists() or latest_symlink.is_symlink():
                 latest_symlink.unlink()
@@ -513,37 +525,32 @@ def main():
         }
 
         logger.info("Batch processing started.")
+        batches = [files[i:i + args.batch_size] for i in range(0, len(files), args.batch_size)] if args.batch_size > 0 else [files]
         try:
             from tqdm import tqdm
-            with ProcessPoolExecutor(max_workers=args.jobs) as executor:
-                futures = [
-                    executor.submit(process_file, str(file), simple_args) for file in files
-                ]
-                progress_bar = tqdm(
-                    total=len(futures),
-                    desc="Batch progress",
-                    unit="file",
-                    position=1,
-                    leave=True,
-                    dynamic_ncols=True
-                )
-                for i, future in enumerate(futures):
-                    file_name = files[i].name
-                    if not args.quiet_filenames:
-                        tqdm.write(f"⏳ Processing: {file_name}", file=sys.stdout)
-                    try:
-                        future.result()
-                        summary_stats["success"] += 1
-                    except Exception as e:
-                        import traceback
-                        tb = traceback.format_exc()
-                        msg = f"❌ Error during batch processing: {e}\n{tb}"
-                        console_print(msg, "error")
-                        logger.error(msg)
-                        summary_stats["fail"] += 1
-                    progress_bar.update(1)
-                    progress_bar.set_postfix_str(f"{progress_bar.n}/{progress_bar.total}")
-                progress_bar.close()
+            progress_bar = tqdm(total=len(files), desc="Batch progress", unit="file", position=1, leave=True, dynamic_ncols=True)
+            for batch_index, batch in enumerate(batches):
+                with ProcessPoolExecutor(max_workers=args.jobs) as executor:
+                    futures = [executor.submit(process_file, str(file), simple_args) for file in batch]
+                    for i, future in enumerate(futures):
+                        file_name = batch[i].name
+                        if not args.quiet_filenames:
+                            tqdm.write(f"⏳ Processing: {file_name}", file=sys.stdout)
+                        try:
+                            future.result()
+                            summary_stats["success"] += 1
+                        except Exception as e:
+                            import traceback
+                            tb = traceback.format_exc()
+                            msg = f"❌ Error during batch processing: {e}\n{tb}"
+                            console_print(msg, "error")
+                            logger.error(msg)
+                            summary_stats["fail"] += 1
+                        progress_bar.update(1)
+                        progress_bar.set_postfix_str(f"{progress_bar.n}/{progress_bar.total}")
+                if args.batch_delay and batch_index < len(batches) - 1:
+                    time.sleep(args.batch_delay)
+            progress_bar.close()
         except concurrent.futures.process.BrokenProcessPool as e:
             err_msg = ("❌ Batch processing failed: A process in the pool was terminated abruptly. "
                        "This may be due to running out of memory or a crash in a worker process.\n"

@@ -65,10 +65,36 @@ python autosub_cli.py -i <folder_with_videos>
 - `--max-retries`: Max retry attempts per file on failure (default: 3).
 - `--max-backoff`: Maximum wait time (in seconds) between retries (default: 30).
 - `--print-config`: Print merged configuration from CLI and config file, then exit.
+- `--batch-size`: Number of files to process at once in batch mode (0 = no limit).
+- `--batch-delay`: Delay in seconds between batches (default: 0).
 
 ## Configuration File
 
 You can set default options in a `~/.autosubrc` config file (TOML format). CLI arguments always override config file values. Use `--print-config` to show the effective configuration.
+
+Example `~/.autosubrc`:
+
+```toml
+model = "base"
+language = "en"
+output_format = "srt"
+output_dir = ""
+default = false
+forced = false
+sdh = false
+audio_only = false
+audio_output_dir = ""
+quiet_filenames = false
+dry_run = false
+max_retries = 3
+max_backoff = 30
+logfile = "autosub.log"
+no_logfile = false
+no_color = false
+jobs = 0
+batch_size = 1
+batch_delay = 30
+```
 
 ## Output Naming
 
