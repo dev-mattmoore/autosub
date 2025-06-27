@@ -254,7 +254,7 @@ def process_file(path, args_dict):
                             lines = block.split("\n")
                             if len(lines) >= 3:
                                 text_line = " ".join(lines[2:])
-                                corrected = corrector.generate_text(text_line).text
+                                corrected = corrector.generate_text(text_line, args={"max_new_tokens": 50}).text
                                 corrected_block = "\n".join(lines[:2] + [corrected])
                                 corrected_blocks.append(corrected_block)
                             else:
